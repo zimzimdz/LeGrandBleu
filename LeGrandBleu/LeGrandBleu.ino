@@ -1,75 +1,72 @@
+#include <SPI.h>
+#include <Adafruit_VS1053.h>
 #include <SD.h>
-#include "TMRpcm.h"
-#include "SPI.h"
-#include <LiquidCrystal.h>
-#include <DHT.h>
 
-#define SD_CARD_PORT 10 // SD card port (CS)
-#define SPEAKER_PORT 9 // Speaker port
-#define TEST_FILE "test.wav"
-#define SPEAKER_VOLUME 5
-#define DHT11_PIN 6
+#define SHIELD_RESET  -1      // VS1053 reset pin (unused!)
+#define SHIELD_CS     7      // VS1053 chip select pin (output)
+#define SHIELD_DCS    6      // VS1053 Data/command select pin (output)
+#define CARDCS 4     // Card chip select pin
+#define DREQ 3 
+#define RELAY_PIN 2
+#define MAX_TRACK 5
+#define VOLUME 3
 
-// initialize the library by associating any needed LCD interface pin
-// with the arduino pin number it is connected to
-const int rs = 8, en = 7, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+using namespace std;
+Adafruit_VS1053_FilePlayer musicPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
 
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-TMRpcm tmrpcm;
-Sd2Card sdCard;
-DHT dht(DHT11_PIN, DHT11);
+const char* tracks[MAX_TRACK] = { "/track001.mp3", "/track002.mp3", "/track003.mp3", "/track004.mp3", "/track005.mp3" };
+
+bool playTrack(const char* track)
+{
+  return musicPlayer.startPlayingFile(track);
+}
+
+int randomTrackIndex()
+{
+  return random(MAX_TRACK);
+}
 
 void setup()
 {
-  // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);
-  lcd.setCursor(1, 0);
-  lcd.print("Le Grand Bleu");
-
   Serial.begin(9600);
-  Serial.println(F("SD card infos"));
-  Serial.println(F("==============================================================="));
-  Serial.println();
+  Serial.println("Le Grand Bleu");
 
-  // Check whether sd card is plugged in
-  if (!sdCard.init(SPI_HALF_SPEED, SD_CARD_PORT)) 
+  // Init relay
+  pinMode(RELAY_PIN, OUTPUT);
+  
+  if (!musicPlayer.begin())
   {
-    Serial.println(F("Failed !"));
-    Serial.println();
-  } 
-  else
-  {
-    Serial.println(F("SD card plugged in !"));
-    Serial.println();
-
-    if(!SD.begin(SD_CARD_PORT))
-    {
-      Serial.println(F("SD fail"));
-      return;
-    }
-
-    Serial.println(F("Reading audio."));
-    Serial.println();
-
-    tmrpcm.speakerPin=SPEAKER_PORT;
-    tmrpcm.setVolume(SPEAKER_VOLUME);
-    tmrpcm.play(TEST_FILE);
+     Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
+     return;
   }
+
+  Serial.println(F("VS1053 found"));
+  
+  if (!SD.begin(CARDCS))
+  {
+    Serial.println(F("SD failed, or not present"));
+    return;
+  }
+ 
+  // Set volume for left, right channels. lower numbers == louder volume!
+  musicPlayer.setVolume(VOLUME,VOLUME);
+
+  // If DREQ is on an interrupt pin (on uno, #2 or #3) we can do background
+  // audio playing
+  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);  // DREQ int
+
+  randomSeed(analogRead(0));
+  playTrack(tracks[randomTrackIndex()]);
 }
 
 void loop()
 {
-  lcd.setCursor(1, 1);
+  digitalWrite(RELAY_PIN, HIGH);
 
-  if(dht.read())
+  // File is playing in the background
+  if (musicPlayer.stopped())
   {
-    lcd.print(dht.readTemperature());
-    lcd.print((char)223);
-    lcd.print("C ");
-
-    const int humidity = dht.readHumidity();
-    lcd.print(humidity);
-    lcd.print("%");
-    delay(2000);
+    playTrack(tracks[randomTrackIndex()]);
   }
+
 }
