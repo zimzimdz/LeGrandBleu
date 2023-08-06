@@ -1,15 +1,23 @@
+//**********************************************************************************
+//**********************************************************************************
+//**********************************************************************************
+//************************* Copyright(C) Chips Molle 2023 **************************
+//**********************************************************************************
+//**********************************************************************************
+//**********************************************************************************
+
 #include <SPI.h>
 #include <Adafruit_VS1053.h>
 #include <SD.h>
 
 #define SHIELD_RESET  -1      // VS1053 reset pin (unused!)
-#define SHIELD_CS     7      // VS1053 chip select pin (output)
-#define SHIELD_DCS    6      // VS1053 Data/command select pin (output)
-#define CARDCS 4     // Card chip select pin
-#define DREQ 3 
-#define RELAY_PIN 2
-#define MAX_TRACK 5
-#define VOLUME 3
+#define SHIELD_CS      7      // VS1053 chip select pin (output)
+#define SHIELD_DCS     6      // VS1053 Data/command select pin (output)
+#define CARDCS         4      // Card chip select pin
+#define DREQ           3 
+#define RELAY_PIN      2
+#define MAX_TRACK      5      // Max track available on SD
+#define VOLUME         3      // Volume - Lower=Louder
 
 using namespace std;
 Adafruit_VS1053_FilePlayer musicPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
@@ -48,15 +56,18 @@ void setup()
     return;
   }
  
-  // Set volume for left, right channels. lower numbers == louder volume!
+  // Set volume for left, right channels.
   musicPlayer.setVolume(VOLUME,VOLUME);
 
   // If DREQ is on an interrupt pin (on uno, #2 or #3) we can do background
   // audio playing
-  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);  // DREQ int
+  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
 
   randomSeed(analogRead(0));
-  playTrack(tracks[randomTrackIndex()]);
+  while(!playTrack(tracks[randomTrackIndex()]))
+  {
+    Serial.println(F("Couldn't start playing track."));
+  }
 }
 
 void loop()
@@ -68,5 +79,4 @@ void loop()
   {
     playTrack(tracks[randomTrackIndex()]);
   }
-
 }
